@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase, Strategy, Pair, Trade } from '@/lib/supabase'
 import TradeForm from '@/components/TradeForm'
 import TradeTable from '@/components/TradeTable'
+import TradeDetailModal from '@/components/TradeDetailModal'
 
 export default function TradesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
@@ -10,6 +11,7 @@ export default function TradesPage() {
   const [trades, setTrades] = useState<Trade[]>([])
   const [filterStrategy, setFilterStrategy] = useState('')
   const [filterPair, setFilterPair] = useState('')
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null)
 
   async function loadAll() {
     const [{ data: s }, { data: p }, { data: t }] = await Promise.all([
@@ -59,7 +61,8 @@ export default function TradesPage() {
         )}
       </div>
 
-      <TradeTable trades={filtered} />
+      <TradeTable trades={filtered} onSelect={setSelectedTrade} />
+      <TradeDetailModal trade={selectedTrade} onClose={() => setSelectedTrade(null)} />
     </div>
   )
 }

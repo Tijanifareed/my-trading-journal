@@ -1,7 +1,7 @@
 'use client'
 import { Trade } from '@/lib/supabase'
 
-export default function TradeTable({ trades }: { trades: Trade[] }) {
+export default function TradeTable({ trades, onSelect }: { trades: Trade[]; onSelect: (t: Trade) => void }) {
   const outcomeStyle = (o: string | null) => {
     if (o === 'Win') return { color: 'var(--color-profit)', bg: 'rgba(52,195,147,0.12)' }
     if (o === 'Loss') return { color: 'var(--color-loss)', bg: 'rgba(240,85,95,0.12)' }
@@ -12,7 +12,7 @@ export default function TradeTable({ trades }: { trades: Trade[] }) {
     <div className="bg-[#12161C] border border-[#1F252D] rounded-lg overflow-hidden">
       <div className="px-5 py-4 border-b border-[#1F252D]">
         <div className="font-display font-medium text-sm">Trade Log</div>
-        <div className="text-xs text-[#7C8695] mt-0.5">{trades.length} trade{trades.length !== 1 ? 's' : ''}</div>
+        <div className="text-xs text-[#7C8695] mt-0.5">{trades.length} trade{trades.length !== 1 ? 's' : ''} · click a row to view details</div>
       </div>
 
       {trades.length === 0 ? (
@@ -41,7 +41,11 @@ export default function TradeTable({ trades }: { trades: Trade[] }) {
               {trades.map(t => {
                 const os = outcomeStyle(t.outcome)
                 return (
-                  <tr key={t.id} className="border-b border-[#1F252D] last:border-0 hover:bg-[#161B22] transition-colors">
+                  <tr
+                    key={t.id}
+                    onClick={() => onSelect(t)}
+                    className="border-b border-[#1F252D] last:border-0 hover:bg-[#161B22] transition-colors cursor-pointer"
+                  >
                     <td className="px-5 py-3 font-mono text-xs text-[#7C8695] whitespace-nowrap">{t.date}</td>
                     <td className="px-3 py-3 whitespace-nowrap">{t.strategies?.name ?? '-'}</td>
                     <td className="px-3 py-3 font-mono text-xs whitespace-nowrap">{t.pairs?.symbol ?? '-'}</td>
@@ -64,12 +68,7 @@ export default function TradeTable({ trades }: { trades: Trade[] }) {
                       {t.result_r != null ? `${t.result_r >= 0 ? '+' : ''}${t.result_r}R` : '-'}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {t.screenshot_url ? (
-                        <a href={t.screenshot_url} target="_blank" rel="noreferrer"
-                          className="text-[#7C8695] hover:text-[#E7EAEE] transition-colors" title="View screenshot">
-                          🖼
-                        </a>
-                      ) : <span className="text-[#3A4250]">-</span>}
+                      {t.screenshot_url ? <span title="Has screenshot">🖼</span> : <span className="text-[#3A4250]">-</span>}
                     </td>
                     <td className="px-3 py-3 max-w-[200px] truncate text-xs text-[#7C8695]" title={t.notes ?? ''}>{t.notes}</td>
                   </tr>
