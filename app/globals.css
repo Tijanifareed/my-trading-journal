@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-profit: #34C393;
+  --color-loss: #F0555F;
+  --color-neutral: #E3A64B;
+  --color-panel: #12161C;
+  --color-border: #1F252D;
+  --color-muted: #7C8695;
+}
+
+.font-display { font-family: var(--font-display), sans-serif; }
+.font-body { font-family: var(--font-body), sans-serif; }
+.font-mono { font-family: var(--font-mono), monospace; }
