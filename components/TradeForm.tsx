@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase, Strategy, Pair } from '@/lib/supabase'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -106,6 +107,14 @@ export default function TradeForm({
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    setForm(f => f.strategy_id ? f : { ...f, strategy_id: strategies[0]?.id ?? f.strategy_id })
+  }, [strategies])
+
+  useEffect(() => {
+    setForm(f => f.pair_id ? f : { ...f, pair_id: pairs[0]?.id ?? f.pair_id })
+  }, [pairs])
+
   async function handleAddStrategy(name: string) {
     const { data, error } = await supabase.from('strategies').insert({ name }).select().single()
     if (error) { alert(error.message); return }
@@ -122,6 +131,8 @@ export default function TradeForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.strategy_id) { alert('Please select a strategy'); return }
+    if (!form.pair_id) { alert('Please select a pair'); return }
     setSaving(true)
     let screenshot_url: string | null = null
 
