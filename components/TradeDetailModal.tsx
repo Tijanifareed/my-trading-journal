@@ -45,16 +45,35 @@ export default function TradeDetailModal({ trade, onClose }: { trade: Trade | nu
         </div>
 
         <div className="p-5 grid md:grid-cols-2 gap-6">
-          <div>
-            {trade.screenshot_url ? (
-              <a href={trade.screenshot_url} target="_blank" rel="noreferrer" className="block group">
-                <img
-                  src={trade.screenshot_url}
-                  alt="Trade screenshot"
-                  className="w-full rounded-md border border-[#1F252D] group-hover:opacity-90 transition-opacity"
-                />
-                <div className="text-[11px] text-[#7C8695] mt-2 font-mono">Click to open full size</div>
-              </a>
+          <div className="space-y-4">
+            {(trade.screenshot_daily_url || trade.screenshot_4h_url) ? (
+              [
+                { label: 'Daily', url: trade.screenshot_daily_url },
+                { label: '4H', url: trade.screenshot_4h_url },
+              ].map(shot => (
+                <div key={shot.label}>
+                  <div className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono mb-1.5">{shot.label}</div>
+                  {shot.url ? (
+                    <a href={shot.url} target="_blank" rel="noreferrer" className="block group">
+                      <img src={shot.url} alt={`${shot.label} screenshot`}
+                        className="w-full rounded-md border border-[#1F252D] group-hover:opacity-90 transition-opacity" />
+                    </a>
+                  ) : (
+                    <div className="w-full aspect-video rounded-md border border-dashed border-[#1F252D] flex items-center justify-center text-xs text-[#7C8695] font-mono">
+                      Not attached
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : trade.screenshot_url ? (
+              <div>
+                <div className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono mb-1.5">Screenshot</div>
+                <a href={trade.screenshot_url} target="_blank" rel="noreferrer" className="block group">
+                  <img src={trade.screenshot_url} alt="Trade screenshot"
+                    className="w-full rounded-md border border-[#1F252D] group-hover:opacity-90 transition-opacity" />
+                </a>
+                <div className="text-[11px] text-[#7C8695] mt-2 font-mono">Logged before Daily/4H split</div>
+              </div>
             ) : (
               <div className="w-full aspect-video rounded-md border border-dashed border-[#1F252D] flex items-center justify-center text-sm text-[#7C8695] font-mono">
                 No screenshot attached
@@ -62,7 +81,7 @@ export default function TradeDetailModal({ trade, onClose }: { trade: Trade | nu
             )}
 
             {trade.notes && (
-              <div className="mt-4">
+              <div>
                 <div className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono mb-1.5">Notes</div>
                 <div className="text-sm text-[#E7EAEE] bg-[#0B0E11] border border-[#1F252D] rounded-md p-3 whitespace-pre-wrap">
                   {trade.notes}

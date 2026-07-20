@@ -14,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <span className="font-display font-bold tracking-tight">Trade Journal</span>
           <Link href="/trades" className="text-[#7C8695] hover:text-[#E7EAEE] text-sm transition-colors">Trade Log</Link>
           <Link href="/stats" className="text-[#7C8695] hover:text-[#E7EAEE] text-sm transition-colors">Stats</Link>
+          <Link href="/strategies/bnr" className="text-[#7C8695] hover:text-[#E7EAEE] text-sm transition-colors">Rules</Link>
         </nav>
         <main className="p-6 max-w-7xl mx-auto">{children}</main>
       </body>

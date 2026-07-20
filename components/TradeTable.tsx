@@ -1,6 +1,14 @@
 'use client'
 import { Trade } from '@/lib/supabase'
 
+function shotIndicator(t: Trade) {
+  if (t.screenshot_daily_url || t.screenshot_4h_url) {
+    return (t.screenshot_daily_url ? '🖼' : '·') + (t.screenshot_4h_url ? '🖼' : '·')
+  }
+  if (t.screenshot_url) return '🖼'
+  return '-'
+}
+
 export default function TradeTable({ trades, onSelect }: { trades: Trade[]; onSelect: (t: Trade) => void }) {
   const outcomeStyle = (o: string | null) => {
     if (o === 'Win') return { color: 'var(--color-profit)', bg: 'rgba(52,195,147,0.12)' }
@@ -68,7 +76,9 @@ export default function TradeTable({ trades, onSelect }: { trades: Trade[]; onSe
                       {t.result_r != null ? `${t.result_r >= 0 ? '+' : ''}${t.result_r}R` : '-'}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {t.screenshot_url ? <span title="Has screenshot">🖼</span> : <span className="text-[#3A4250]">-</span>}
+                      <span className="text-xs" title={t.screenshot_url && !t.screenshot_daily_url ? 'Legacy screenshot' : undefined}>
+                        {shotIndicator(t)}
+                      </span>
                     </td>
                     <td className="px-3 py-3 max-w-[200px] truncate text-xs text-[#7C8695]" title={t.notes ?? ''}>{t.notes}</td>
                   </tr>

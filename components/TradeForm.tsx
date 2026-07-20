@@ -104,7 +104,8 @@ export default function TradeForm({
     result_r: '',
     notes: '',
   })
-  const [file, setFile] = useState<File | null>(null)
+  const [fileDaily, setFileDaily] = useState<File | null>(null)
+  const [file4h, setFile4h] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -129,18 +130,30 @@ export default function TradeForm({
     setForm(f => ({ ...f, pair_id: data.id }))
   }
 
+  async function uploadShot(file: File) {
+    const path = `${Date.now()}-${file.name}`
+    const { error } = await supabase.storage.from('trade-screenshots').upload(path, file)
+    if (error) throw error
+    return supabase.storage.from('trade-screenshots').getPublicUrl(path).data.publicUrl
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.strategy_id) { alert('Please select a strategy'); return }
     if (!form.pair_id) { alert('Please select a pair'); return }
     setSaving(true)
-    let screenshot_url: string | null = null
 
-    if (file) {
-      const path = `${Date.now()}-${file.name}`
-      const { error: upErr } = await supabase.storage.from('trade-screenshots').upload(path, file)
-      if (upErr) { alert(upErr.message); setSaving(false); return }
-      screenshot_url = supabase.storage.from('trade-screenshots').getPublicUrl(path).data.publicUrl
+    let screenshot_daily_url: string | null = null
+    let screenshot_4h_url: string | null = null
+
+    try {
+      if (fileDaily) screenshot_daily_url = await uploadShot(fileDaily)
+      if (file4h) screenshot_4h_url = await uploadShot(file4h)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      alert(err.message)
+      setSaving(false)
+      return
     }
 
     const { error } = await supabase.from('trades').insert({
@@ -152,16 +165,17 @@ export default function TradeForm({
       take_profit: form.take_profit ? Number(form.take_profit) : null,
       planned_rr: form.planned_rr ? Number(form.planned_rr) : null,
       result_r: form.result_r ? Number(form.result_r) : null,
-      screenshot_url,
+      screenshot_daily_url,
+      screenshot_4h_url,
     })
 
     setSaving(false)
     if (error) { alert(error.message); return }
-    setFile(null)
+    setFileDaily(null)
+    setFile4h(null)
     setForm(f => ({ ...f, entry: '', stop_loss: '', take_profit: '', planned_rr: '', result_r: '', notes: '' }))
     onSaved()
   }
-
   const input = "bg-[#0B0E11] border border-[#1F252D] rounded-md px-3 py-2 w-full text-sm font-mono focus:outline-none focus:border-[#3A4250] transition-colors"
   const outcomeColor = form.outcome === 'Win' ? 'var(--color-profit)' : form.outcome === 'Loss' ? 'var(--color-loss)' : 'var(--color-neutral)'
 
@@ -232,10 +246,15 @@ export default function TradeForm({
           <input placeholder="e.g. 2.5 or -1" type="number" step="any" className={input}
             value={form.result_r} onChange={e => setForm({ ...form, result_r: e.target.value })} />
         </Field>
-        <Field label="Screenshot">
+        <Field label="Screenshot — Daily">
           <input type="file" accept="image/*"
             className="text-xs text-[#7C8695] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-[#1F252D] file:text-[#E7EAEE] file:text-xs hover:file:bg-[#2A313B] w-full"
-            onChange={e => setFile(e.target.files?.[0] ?? null)} />
+            onChange={e => setFileDaily(e.target.files?.[0] ?? null)} />
+        </Field>
+        <Field label="Screenshot — 4H">
+          <input type="file" accept="image/*"
+            className="text-xs text-[#7C8695] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-[#1F252D] file:text-[#E7EAEE] file:text-xs hover:file:bg-[#2A313B] w-full"
+            onChange={e => setFile4h(e.target.files?.[0] ?? null)} />
         </Field>
       </div>
 
