@@ -71,7 +71,7 @@ export default function RRCalculator() {
       <div className="bg-[#12161C] border border-[#1F252D] rounded-lg p-5 space-y-4">
         <div>
           <div className="font-display font-medium text-sm">Trade Inputs</div>
-          <div className="text-xs text-[#7C8695] mt-0.5">Fill in what you have — results update live</div>
+          <div className="text-xs text-[#7C8695] mt-0.5">Fill in what you have, results update live</div>
         </div>
 
         <Field label="Direction">
