@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/static-components */
 'use client'
 import { useState, useMemo } from 'react'
 
@@ -18,6 +19,8 @@ export default function RRCalculator() {
   const [stopLoss, setStopLoss] = useState('')
   const [takeProfit, setTakeProfit] = useState('')
   const [exitPrice, setExitPrice] = useState('')
+  const [feePct, setFeePct] = useState('0.1')
+  const [leverage, setLeverage] = useState('1')
 
   const input = "bg-[#0B0E11] border border-[#1F252D] rounded-md px-3 py-2 w-full text-sm font-mono focus:outline-none focus:border-[#3A4250] transition-colors"
 
@@ -28,41 +31,99 @@ export default function RRCalculator() {
     const exit = parseFloat(exitPrice)
     const acct = parseFloat(accountSize)
     const risk = parseFloat(riskPct)
+    const fee = parseFloat(feePct) || 0
 
     if (isNaN(e) || isNaN(sl) || e === sl) return null
 
     const riskPerUnit = Math.abs(e - sl)
-    const validDirection =
-      (direction === 'Long' && sl < e) || (direction === 'Short' && sl > e)
+    const validDirection = (direction === 'Long' && sl < e) || (direction === 'Short' && sl > e)
 
     let riskAmount: number | null = null
     let positionSize: number | null = null
+    let positionValue: number | null = null
     if (!isNaN(acct) && !isNaN(risk) && acct > 0 && risk > 0) {
       riskAmount = acct * (risk / 100)
       positionSize = riskAmount / riskPerUnit
+      positionValue = positionSize * e
+    }
+
+    // helper: USDT P&L for a given exit price, position size, including entry+exit fees
+    function pnlFor(exitPx: number): { gross: number; fees: number; net: number } | null {
+      if (positionSize == null || positionValue == null) return null
+      const gross = direction === 'Long'
+        ? (exitPx - e) * positionSize
+        : (e - exitPx) * positionSize
+      const exitValue = positionSize * exitPx
+      const feesPaid = (positionValue * (fee / 100)) + (exitValue * (fee / 100))
+      return { gross, fees: feesPaid, net: gross - feesPaid }
     }
 
     let plannedRR: number | null = null
     let tpValid = true
+    let plannedPnL: ReturnType<typeof pnlFor> = null
     if (!isNaN(tp)) {
       const rewardPerUnit = direction === 'Long' ? tp - e : e - tp
       plannedRR = rewardPerUnit / riskPerUnit
       tpValid = rewardPerUnit > 0
+      plannedPnL = pnlFor(tp)
+    }
+
+    const lev = parseFloat(leverage) || 1
+
+    let marginRequired: number | null = null
+    let liqPrice: number | null = null
+    let liqInsideStop = false
+
+    if (positionValue != null && lev > 0) {
+      marginRequired = positionValue / lev
+
+      // Approximate liquidation price — ignores maintenance margin & funding, exchange-specific in reality
+      liqPrice = direction === 'Long'
+        ? e * (1 - 1 / lev)
+        : e * (1 + 1 / lev)
+
+      liqInsideStop = direction === 'Long'
+        ? liqPrice >= sl
+        : liqPrice <= sl
     }
 
     let resultR: number | null = null
+    let actualPnL: ReturnType<typeof pnlFor> = null
     if (!isNaN(exit)) {
       const movePerUnit = direction === 'Long' ? exit - e : e - exit
       resultR = movePerUnit / riskPerUnit
+      actualPnL = pnlFor(exit)
     }
 
-    return { riskPerUnit, validDirection, riskAmount, positionSize, plannedRR, tpValid, resultR, risk }
-  }, [direction, accountSize, riskPct, entry, stopLoss, takeProfit, exitPrice])
+    // worst-case: loss at stop, including fees
+    const stopLossPnL = pnlFor(sl)
 
+    return {
+      riskPerUnit, validDirection, riskAmount, positionSize, positionValue,
+      plannedRR, tpValid, plannedPnL, resultR, actualPnL, stopLossPnL, risk,
+      lev, marginRequired, liqPrice, liqInsideStop,
+    }
+  }, [direction, accountSize, riskPct, entry, stopLoss, takeProfit, exitPrice, feePct, leverage])
   function copyResultR() {
-    if (results?.resultR != null) {
-      navigator.clipboard.writeText(results.resultR.toFixed(2))
-    }
+    if (results?.resultR != null) navigator.clipboard.writeText(results.resultR.toFixed(2))
+  }
+
+  const PnLRow = ({ label, pnl, sub }: { label: string; pnl: { gross: number; fees: number; net: number } | null; sub?: string }) => {
+    if (!pnl) return null
+    return (
+      <div className="flex justify-between items-start py-2 border-b border-[#1F252D] last:border-0">
+        <div>
+          <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">{label}</span>
+          {sub && <div className="text-[10px] text-[#3A4250] font-mono mt-0.5">{sub}</div>}
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-sm font-medium" style={{ color: pnl.net >= 0 ? 'var(--color-profit)' : 'var(--color-loss)' }}>
+            {pnl.net >= 0 ? '+' : ''}{pnl.net.toFixed(2)} USDT
+          </div>
+          <div className="text-[10px] text-[#7C8695] font-mono">gross {pnl.gross >= 0 ? '+' : ''}{pnl.gross.toFixed(2)} · fees -{pnl.fees.toFixed(2)}</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -71,7 +132,7 @@ export default function RRCalculator() {
       <div className="bg-[#12161C] border border-[#1F252D] rounded-lg p-5 space-y-4">
         <div>
           <div className="font-display font-medium text-sm">Trade Inputs</div>
-          <div className="text-xs text-[#7C8695] mt-0.5">Fill in what you have, results update live</div>
+          <div className="text-xs text-[#7C8695] mt-0.5">Fill in what you have — results update live</div>
         </div>
 
         <Field label="Direction">
@@ -95,8 +156,17 @@ export default function RRCalculator() {
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Account Size ($)"><input type="number" step="any" className={input} placeholder="1000" value={accountSize} onChange={e => setAccountSize(e.target.value)} /></Field>
+          <Field label="Account Size (USDT)"><input type="number" step="any" className={input} placeholder="1000" value={accountSize} onChange={e => setAccountSize(e.target.value)} /></Field>
           <Field label="Risk % (max 2)"><input type="number" step="any" className={input} placeholder="2" value={riskPct} onChange={e => setRiskPct(e.target.value)} /></Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Fee % per side (taker ≈ 0.1)">
+            <input type="number" step="any" className={input} placeholder="0.1" value={feePct} onChange={e => setFeePct(e.target.value)} />
+          </Field>
+          <Field label="Leverage (1 = spot/no leverage)">
+            <input type="number" step="any" className={input} placeholder="1" value={leverage} onChange={e => setLeverage(e.target.value)} />
+          </Field>
         </div>
 
         <div className="h-px bg-[#1F252D]" />
@@ -110,10 +180,11 @@ export default function RRCalculator() {
       </div>
 
       {/* Results */}
+      {/* Results */}
       <div className="bg-[#12161C] border border-[#1F252D] rounded-lg p-5 space-y-4">
         <div>
           <div className="font-display font-medium text-sm">Results</div>
-          <div className="text-xs text-[#7C8695] mt-0.5">Position size, planned R:R, result R</div>
+          <div className="text-xs text-[#7C8695] mt-0.5">Position size, R:R, and USDT P&L (fees included)</div>
         </div>
 
         {!results ? (
@@ -126,6 +197,7 @@ export default function RRCalculator() {
               </div>
             )}
 
+            {/* Sizing */}
             <div className="space-y-2.5">
               <div className="flex justify-between items-center py-2 border-b border-[#1F252D]">
                 <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Risk per unit</span>
@@ -136,7 +208,7 @@ export default function RRCalculator() {
                 <div className="flex justify-between items-center py-2 border-b border-[#1F252D]">
                   <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Risk amount</span>
                   <span className="font-mono text-sm" style={{ color: results.risk > 2 ? 'var(--color-loss)' : 'var(--color-neutral)' }}>
-                    ${results.riskAmount.toFixed(2)} {results.risk > 2 && '⚠ over 2% rule'}
+                    {results.riskAmount.toFixed(2)} USDT {results.risk > 2 && '⚠ over 2% rule'}
                   </span>
                 </div>
               )}
@@ -158,24 +230,64 @@ export default function RRCalculator() {
                 </div>
               )}
 
-              {results.resultR != null && (
+              {/* Leverage / liquidation — independent of PnL, shows whenever leverage > 1x is set */}
+              {results.lev > 1 && results.marginRequired != null && (
+                <div className="flex justify-between items-center py-2 border-b border-[#1F252D]">
+                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Margin required ({results.lev}x)</span>
+                  <span className="font-mono text-sm">{results.marginRequired.toFixed(2)} USDT</span>
+                </div>
+              )}
+
+              {results.lev > 1 && results.liqPrice != null && (
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Result R</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-lg font-medium" style={{ color: results.resultR >= 0 ? 'var(--color-profit)' : 'var(--color-loss)' }}>
-                      {results.resultR >= 0 ? '+' : ''}{results.resultR.toFixed(2)}R
-                    </span>
-                    <button
-                      type="button"
-                      onClick={copyResultR}
-                      className="text-[10px] font-mono px-2 py-1 rounded bg-[#1F252D] hover:bg-[#2A313B] text-[#7C8695] hover:text-[#E7EAEE] transition-colors"
-                    >
-                      copy
-                    </button>
-                  </div>
+                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Est. liquidation price</span>
+                  <span className="font-mono text-sm" style={{ color: results.liqInsideStop ? 'var(--color-loss)' : '#E7EAEE' }}>
+                    {results.liqPrice.toFixed(4)}
+                  </span>
                 </div>
               )}
             </div>
+
+            {results.liqInsideStop && (
+              <div className="text-xs font-mono px-3 py-2 rounded-md" style={{ color: 'var(--color-loss)', background: 'rgba(240,85,95,0.1)' }}>
+                ⚠ Liquidation price sits before your stop loss — you&apos;d get liquidated before your stop fills. Lower leverage or widen margin.
+              </div>
+            )}
+
+            {/* USDT outcome */}
+            {(results.plannedPnL || results.actualPnL || results.stopLossPnL) && (
+              <>
+                <div className="h-px bg-[#1F252D]" />
+                <div className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">USDT Outcome</div>
+                <PnLRow label="If stopped out" pnl={results.stopLossPnL} sub="worst case at your stop loss" />
+                <PnLRow label="If TP hits (planned)" pnl={results.plannedPnL} />
+                {results.actualPnL && (
+                  <div className="flex justify-between items-start py-2">
+                    <div>
+                      <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Actual exit</span>
+                      {results.resultR != null && (
+                        <div className="text-[10px] text-[#3A4250] font-mono mt-0.5">{results.resultR >= 0 ? '+' : ''}{results.resultR.toFixed(2)}R</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="font-mono text-lg font-medium" style={{ color: results.actualPnL.net >= 0 ? 'var(--color-profit)' : 'var(--color-loss)' }}>
+                          {results.actualPnL.net >= 0 ? '+' : ''}{results.actualPnL.net.toFixed(2)} USDT
+                        </div>
+                        <div className="text-[10px] text-[#7C8695] font-mono">gross {results.actualPnL.gross >= 0 ? '+' : ''}{results.actualPnL.gross.toFixed(2)} · fees -{results.actualPnL.fees.toFixed(2)}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={copyResultR}
+                        className="text-[10px] font-mono px-2 py-1 rounded bg-[#1F252D] hover:bg-[#2A313B] text-[#7C8695] hover:text-[#E7EAEE] transition-colors shrink-0"
+                      >
+                        copy R
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
       </div>
