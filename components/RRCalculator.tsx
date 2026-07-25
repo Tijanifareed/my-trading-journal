@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/static-components */
 'use client'
 import { useState, useMemo } from 'react'
 
@@ -12,14 +11,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function RRCalculator() {
+  const [mode, setMode] = useState<'risk' | 'margin'>('risk')
   const [direction, setDirection] = useState<'Long' | 'Short'>('Long')
   const [accountSize, setAccountSize] = useState('')
   const [riskPct, setRiskPct] = useState('2')
+  const [marginToUse, setMarginToUse] = useState('')
   const [entry, setEntry] = useState('')
   const [stopLoss, setStopLoss] = useState('')
   const [takeProfit, setTakeProfit] = useState('')
   const [exitPrice, setExitPrice] = useState('')
-  const [feePct, setFeePct] = useState('0.1')
+  const [feePct, setFeePct] = useState('0.055')
   const [leverage, setLeverage] = useState('1')
 
   const input = "bg-[#0B0E11] border border-[#1F252D] rounded-md px-3 py-2 w-full text-sm font-mono focus:outline-none focus:border-[#3A4250] transition-colors"
@@ -32,6 +33,8 @@ export default function RRCalculator() {
     const acct = parseFloat(accountSize)
     const risk = parseFloat(riskPct)
     const fee = parseFloat(feePct) || 0
+    const lev = parseFloat(leverage) || 1
+    const margin = parseFloat(marginToUse)
 
     if (isNaN(e) || isNaN(sl) || e === sl) return null
 
@@ -41,13 +44,32 @@ export default function RRCalculator() {
     let riskAmount: number | null = null
     let positionSize: number | null = null
     let positionValue: number | null = null
-    if (!isNaN(acct) && !isNaN(risk) && acct > 0 && risk > 0) {
-      riskAmount = acct * (risk / 100)
-      positionSize = riskAmount / riskPerUnit
-      positionValue = positionSize * e
+    let marginRequired: number | null = null
+    let impliedRiskPct: number | null = null
+
+    if (mode === 'risk') {
+      // Risk-first: you set the dollar risk, position size is derived.
+      // Leverage only affects margin locked up — P&L is unaffected by leverage in this mode.
+      if (!isNaN(acct) && !isNaN(risk) && acct > 0 && risk > 0) {
+        riskAmount = acct * (risk / 100)
+        positionSize = riskAmount / riskPerUnit
+        positionValue = positionSize * e
+        marginRequired = lev > 0 ? positionValue / lev : null
+      }
+    } else {
+      // Margin-first: you set margin + leverage, position size (and therefore risk/profit) is derived from that.
+      if (!isNaN(margin) && margin > 0 && lev > 0) {
+        marginRequired = margin
+        positionValue = margin * lev
+        positionSize = positionValue / e
+        riskAmount = positionSize * riskPerUnit
+        if (!isNaN(acct) && acct > 0) {
+          impliedRiskPct = (riskAmount / acct) * 100
+        }
+      }
     }
 
-    // helper: USDT P&L for a given exit price, position size, including entry+exit fees
+    // USDT P&L for a given exit price, given current position size, including entry+exit fees
     function pnlFor(exitPx: number): { gross: number; fees: number; net: number } | null {
       if (positionSize == null || positionValue == null) return null
       const gross = direction === 'Long'
@@ -68,23 +90,12 @@ export default function RRCalculator() {
       plannedPnL = pnlFor(tp)
     }
 
-    const lev = parseFloat(leverage) || 1
-
-    let marginRequired: number | null = null
+    // Approximate liquidation price — ignores maintenance margin & funding, exchange-specific in reality
     let liqPrice: number | null = null
     let liqInsideStop = false
-
     if (positionValue != null && lev > 0) {
-      marginRequired = positionValue / lev
-
-      // Approximate liquidation price — ignores maintenance margin & funding, exchange-specific in reality
-      liqPrice = direction === 'Long'
-        ? e * (1 - 1 / lev)
-        : e * (1 + 1 / lev)
-
-      liqInsideStop = direction === 'Long'
-        ? liqPrice >= sl
-        : liqPrice <= sl
+      liqPrice = direction === 'Long' ? e * (1 - 1 / lev) : e * (1 + 1 / lev)
+      liqInsideStop = direction === 'Long' ? liqPrice >= sl : liqPrice <= sl
     }
 
     let resultR: number | null = null
@@ -95,15 +106,15 @@ export default function RRCalculator() {
       actualPnL = pnlFor(exit)
     }
 
-    // worst-case: loss at stop, including fees
     const stopLossPnL = pnlFor(sl)
 
     return {
-      riskPerUnit, validDirection, riskAmount, positionSize, positionValue,
-      plannedRR, tpValid, plannedPnL, resultR, actualPnL, stopLossPnL, risk,
-      lev, marginRequired, liqPrice, liqInsideStop,
+      riskPerUnit, validDirection, riskAmount, positionSize, positionValue, marginRequired,
+      impliedRiskPct, plannedRR, tpValid, plannedPnL, resultR, actualPnL, stopLossPnL, risk,
+      lev, liqPrice, liqInsideStop,
     }
-  }, [direction, accountSize, riskPct, entry, stopLoss, takeProfit, exitPrice, feePct, leverage])
+  }, [mode, direction, accountSize, riskPct, marginToUse, entry, stopLoss, takeProfit, exitPrice, feePct, leverage])
+
   function copyResultR() {
     if (results?.resultR != null) navigator.clipboard.writeText(results.resultR.toFixed(2))
   }
@@ -155,14 +166,41 @@ export default function RRCalculator() {
           </div>
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Account Size (USDT)"><input type="number" step="any" className={input} placeholder="1000" value={accountSize} onChange={e => setAccountSize(e.target.value)} /></Field>
-          <Field label="Risk % (max 2)"><input type="number" step="any" className={input} placeholder="2" value={riskPct} onChange={e => setRiskPct(e.target.value)} /></Field>
-        </div>
+        <Field label="Sizing Method">
+          <div className="flex gap-2">
+            {(['risk', 'margin'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className="flex-1 rounded-md py-2 text-xs font-mono transition-colors border"
+                style={{
+                  borderColor: mode === m ? '#3A4250' : '#1F252D',
+                  color: mode === m ? '#E7EAEE' : '#7C8695',
+                  background: mode === m ? '#1F252D' : 'transparent',
+                }}
+              >
+                {m === 'risk' ? 'Risk-based (2% rule)' : 'Margin-based (leverage sizes it)'}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {mode === 'risk' ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Account Size (USDT)"><input type="number" step="any" className={input} placeholder="1000" value={accountSize} onChange={e => setAccountSize(e.target.value)} /></Field>
+            <Field label="Risk % (max 2)"><input type="number" step="any" className={input} placeholder="2" value={riskPct} onChange={e => setRiskPct(e.target.value)} /></Field>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Margin to Use (USDT)"><input type="number" step="any" className={input} placeholder="500" value={marginToUse} onChange={e => setMarginToUse(e.target.value)} /></Field>
+            <Field label="Account Size (USDT, optional)"><input type="number" step="any" className={input} placeholder="for % check" value={accountSize} onChange={e => setAccountSize(e.target.value)} /></Field>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Fee % per side (taker ≈ 0.1)">
-            <input type="number" step="any" className={input} placeholder="0.1" value={feePct} onChange={e => setFeePct(e.target.value)} />
+          <Field label="Fee % per side (taker ≈ 0.055)">
+            <input type="number" step="any" className={input} placeholder="0.055" value={feePct} onChange={e => setFeePct(e.target.value)} />
           </Field>
           <Field label="Leverage (1 = spot/no leverage)">
             <input type="number" step="any" className={input} placeholder="1" value={leverage} onChange={e => setLeverage(e.target.value)} />
@@ -179,7 +217,6 @@ export default function RRCalculator() {
         </div>
       </div>
 
-      {/* Results */}
       {/* Results */}
       <div className="bg-[#12161C] border border-[#1F252D] rounded-lg p-5 space-y-4">
         <div>
@@ -206,10 +243,25 @@ export default function RRCalculator() {
 
               {results.riskAmount != null && (
                 <div className="flex justify-between items-center py-2 border-b border-[#1F252D]">
-                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Risk amount</span>
-                  <span className="font-mono text-sm" style={{ color: results.risk > 2 ? 'var(--color-loss)' : 'var(--color-neutral)' }}>
-                    {results.riskAmount.toFixed(2)} USDT {results.risk > 2 && '⚠ over 2% rule'}
+                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">
+                    {mode === 'risk' ? 'Risk amount (set by you)' : 'Risk amount (derived)'}
                   </span>
+                  <span
+                    className="font-mono text-sm"
+                    style={{ color: (mode === 'risk' ? results.risk > 2 : (results.impliedRiskPct ?? 0) > 2) ? 'var(--color-loss)' : 'var(--color-neutral)' }}
+                  >
+                    {results.riskAmount.toFixed(2)} USDT
+                    {mode === 'margin' && results.impliedRiskPct != null && ` (${results.impliedRiskPct.toFixed(2)}% of account)`}
+                    {mode === 'risk' && results.risk > 2 && ' ⚠ over 2% rule'}
+                    {mode === 'margin' && results.impliedRiskPct != null && results.impliedRiskPct > 2 && ' ⚠ over 2% rule'}
+                  </span>
+                </div>
+              )}
+
+              {results.marginRequired != null && (
+                <div className="flex justify-between items-center py-2 border-b border-[#1F252D]">
+                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Margin ({results.lev}x)</span>
+                  <span className="font-mono text-sm">{results.marginRequired.toFixed(2)} USDT</span>
                 </div>
               )}
 
@@ -227,14 +279,6 @@ export default function RRCalculator() {
                     {!results.tpValid ? 'TP is wrong side of entry' : `1 : ${results.plannedRR.toFixed(2)}`}
                     {results.tpValid && results.plannedRR < 2 && ' (below 1:2 min)'}
                   </span>
-                </div>
-              )}
-
-              {/* Leverage / liquidation — independent of PnL, shows whenever leverage > 1x is set */}
-              {results.lev > 1 && results.marginRequired != null && (
-                <div className="flex justify-between items-center py-2 border-b border-[#1F252D]">
-                  <span className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono">Margin required ({results.lev}x)</span>
-                  <span className="font-mono text-sm">{results.marginRequired.toFixed(2)} USDT</span>
                 </div>
               )}
 
