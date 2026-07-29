@@ -62,7 +62,12 @@ export default function TradesPage() {
       </div>
 
       <TradeTable trades={filtered} onSelect={setSelectedTrade} />
-      <TradeDetailModal trade={selectedTrade} onClose={() => setSelectedTrade(null)} />
-    </div>
+<TradeDetailModal
+  trade={selectedTrade}
+  strategies={strategies}
+  pairs={pairs}
+  onClose={() => setSelectedTrade(null)}
+  onChanged={loadAll}
+/>    </div>
   )
 }

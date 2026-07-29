@@ -1,16 +1,40 @@
 /* eslint-disable react-hooks/static-components */
 'use client'
-import { useEffect } from 'react'
-import { Trade } from '@/lib/supabase'
+import { useEffect, useState } from 'react'
+import { Trade, Strategy, Pair } from '@/lib/supabase'
+import TradeEditModal from './TradeEditModal'
 
-export default function TradeDetailModal({ trade, onClose }: { trade: Trade | null; onClose: () => void }) {
+export default function TradeDetailModal({
+  trade, strategies, pairs, onClose, onChanged,
+}: {
+  trade: Trade | null
+  strategies: Strategy[]
+  pairs: Pair[]
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape' && !editing) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, editing])
 
   if (!trade) return null
+
+  if (editing) {
+    return (
+      <TradeEditModal
+        trade={trade}
+        strategies={strategies}
+        pairs={pairs}
+        onClose={() => setEditing(false)}
+        onSaved={() => { setEditing(false); onChanged(); onClose() }}
+        onDeleted={() => { setEditing(false); onChanged(); onClose() }}
+      />
+    )
+  }
 
   const outcomeColor = trade.outcome === 'Win' ? 'var(--color-profit)' : trade.outcome === 'Loss' ? 'var(--color-loss)' : 'var(--color-neutral)'
   const outcomeBg = trade.outcome === 'Win' ? 'rgba(52,195,147,0.12)' : trade.outcome === 'Loss' ? 'rgba(240,85,95,0.12)' : 'rgba(227,166,75,0.12)'
@@ -23,10 +47,7 @@ export default function TradeDetailModal({ trade, onClose }: { trade: Trade | nu
   )
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-[#12161C] border border-[#1F252D] rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
@@ -41,7 +62,15 @@ export default function TradeDetailModal({ trade, onClose }: { trade: Trade | nu
             </div>
             <div className="text-xs text-[#7C8695] mt-0.5 font-mono">{trade.date} · {trade.strategies?.name ?? 'Unassigned strategy'}</div>
           </div>
-          <button onClick={onClose} className="text-[#7C8695] hover:text-[#E7EAEE] text-xl leading-none transition-colors">✕</button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs font-mono px-3 py-1.5 rounded-md bg-[#1F252D] hover:bg-[#2A313B] text-[#E7EAEE] transition-colors"
+            >
+              Edit
+            </button>
+            <button onClick={onClose} className="text-[#7C8695] hover:text-[#E7EAEE] text-xl leading-none transition-colors">✕</button>
+          </div>
         </div>
 
         <div className="p-5 grid md:grid-cols-2 gap-6">
