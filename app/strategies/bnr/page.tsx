@@ -53,15 +53,21 @@ export default function BnRRulesetPage() {
           <p>Place TP close to the swing low/high.</p>
         </RuleBlock>
 
-        <RuleBlock number="Rule 9" title="Stop Loss">
+        <RuleBlock number="Rule 9" title="TP Level Confirmation">
+          <p className="font-medium text-[#E7EAEE]">Non-negotiable: any level used to place a Take Profit must have a closed candle at that price, not just a wick.</p>
+          <p>If price has only wicked into the level, it is not valid as a TP target, wait for a closed candle or use a different level.</p>
+          <p>This does not apply to Stop Loss placement, a wick is sufficient there.</p>
+        </RuleBlock>
+
+        <RuleBlock number="Rule 10" title="Stop Loss">
           <p>Place SL a bit under/above liquidity (long/short respectively).</p>
         </RuleBlock>
 
-        <RuleBlock number="Rule 10" title="Risk Per Trade">
+        <RuleBlock number="Rule 11" title="Risk Per Trade">
           <p className="font-mono text-[var(--color-loss)]">Max 2% of total account.</p>
           <p className="font-mono text-[var(--color-profit)]">Minimum 1:2 R:R, non-negotiable.</p>
         </RuleBlock>
       </div>
     </div>
   )
-}
+} 
