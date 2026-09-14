@@ -75,10 +75,11 @@ export default function TradeDetailModal({
 
         <div className="p-5 grid md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            {(trade.screenshot_daily_url || trade.screenshot_4h_url) ? (
+            {(trade.screenshot_daily_url || trade.screenshot_4h_url || trade.screenshot_entry_url) ? (
               [
                 { label: 'Daily', url: trade.screenshot_daily_url },
                 { label: '4H', url: trade.screenshot_4h_url },
+                { label: 'Entry', url: trade.screenshot_entry_url },
               ].map(shot => (
                 <div key={shot.label}>
                   <div className="text-[11px] text-[#7C8695] uppercase tracking-wider font-mono mb-1.5">{shot.label}</div>

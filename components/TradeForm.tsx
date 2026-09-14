@@ -106,6 +106,7 @@ export default function TradeForm({
   })
   const [fileDaily, setFileDaily] = useState<File | null>(null)
   const [file4h, setFile4h] = useState<File | null>(null)
+  const [fileEntry, setFileEntry] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -145,10 +146,12 @@ export default function TradeForm({
 
     let screenshot_daily_url: string | null = null
     let screenshot_4h_url: string | null = null
+    let screenshot_entry_url: string | null = null
 
     try {
       if (fileDaily) screenshot_daily_url = await uploadShot(fileDaily)
       if (file4h) screenshot_4h_url = await uploadShot(file4h)
+      if (fileEntry) screenshot_entry_url = await uploadShot(fileEntry)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       alert(err.message)
@@ -167,12 +170,14 @@ export default function TradeForm({
       result_r: form.result_r ? Number(form.result_r) : null,
       screenshot_daily_url,
       screenshot_4h_url,
+      screenshot_entry_url,
     })
 
     setSaving(false)
     if (error) { alert(error.message); return }
     setFileDaily(null)
     setFile4h(null)
+    setFileEntry(null)
     setForm(f => ({ ...f, entry: '', stop_loss: '', take_profit: '', planned_rr: '', result_r: '', notes: '' }))
     onSaved()
   }
@@ -255,6 +260,11 @@ export default function TradeForm({
           <input type="file" accept="image/*"
             className="text-xs text-[#7C8695] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-[#1F252D] file:text-[#E7EAEE] file:text-xs hover:file:bg-[#2A313B] w-full"
             onChange={e => setFile4h(e.target.files?.[0] ?? null)} />
+        </Field>
+        <Field label="Screenshot — Entry">
+          <input type="file" accept="image/*"
+            className="text-xs text-[#7C8695] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-[#1F252D] file:text-[#E7EAEE] file:text-xs hover:file:bg-[#2A313B] w-full"
+            onChange={e => setFileEntry(e.target.files?.[0] ?? null)} />
         </Field>
       </div>
 

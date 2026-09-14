@@ -23,6 +23,7 @@ export type Trade = {
   screenshot_url: string | null       // legacy, old trades only
   screenshot_daily_url: string | null
   screenshot_4h_url: string | null
+  screenshot_entry_url: string | null
   notes: string | null
   created_at: string
   strategies?: { name: string } | null
