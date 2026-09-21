@@ -34,7 +34,7 @@ export default function BnRRulesetPage() {
         </RuleBlock>
 
         <RuleBlock number="Rule 4" title="Demand / Supply Zones">
-          <p>Mark demand/supply zones on 4H and Daily: the last down candle before an impulsive up move (demand), or last up candle before an impulsive down move (supply).</p>
+          <p>Mark Daily/4H supply and demand where strong moves begin: last down candle or pause before a strong move up = demand; last up candle or pause before a strong move down = supply. If the area is too wide or unclear, use 1H/15M to find a more precise starting point.</p>
         </RuleBlock>
 
         <RuleBlock number="Rule 5" title="Box the Zones">
@@ -46,7 +46,7 @@ export default function BnRRulesetPage() {
         </RuleBlock>
 
         <RuleBlock number="Rule 7" title="Reaction & Confirmation">
-          <p>Wait for price to reach a boxed zone, observe the reaction, and look for continuation/reversal patterns on 1H/15m.</p>
+          <p>Wait for price to reach a boxed zone, observe the reaction, and look for continuation/reversal patterns on 15m/5m/1m.</p>
         </RuleBlock>
 
         <RuleBlock number="Rule 8" title="Take Profit">
